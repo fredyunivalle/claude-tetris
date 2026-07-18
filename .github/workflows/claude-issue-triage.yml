@@ -1,0 +1,80 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    # Evita bucles: no reaccionar a acciones hechas por bots (incluido este workflow)
+    if: github.event.sender.type != 'Bot'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude issue triage
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE NUMBER: ${{ github.event.issue.number }}
+            ISSUE TITLE: ${{ github.event.issue.title }}
+            ISSUE BODY:
+            ${{ github.event.issue.body }}
+
+            Eres un asistente de triage de issues para este repositorio (un juego
+            de Tetris clásico en JavaScript vanilla + HTML5 Canvas + CSS, sin
+            dependencias ni build step). Si existe CLAUDE.md o README.md, léelos
+            para entender las reglas del juego y la arquitectura antes de
+            analizar el issue. Revisa también el código relevante (game.js,
+            index.html, style.css) para fundamentar tu análisis.
+
+            Tu tarea tiene dos partes:
+
+            ## 1. Asignar labels
+
+            Los ÚNICOS labels que existen en este repositorio son:
+            bug, documentation, duplicate, enhancement, good first issue,
+            help wanted, invalid, question, wontfix
+
+            Elige los que apliquen (puede ser más de uno, o ninguno si no aplica
+            ninguno). NO crees labels nuevos bajo ninguna circunstancia. Aplica
+            los labels elegidos con:
+            gh issue edit ${{ github.event.issue.number }} --add-label "<label>"
+
+            ## 2. Publicar diagnóstico
+
+            Publica UN comentario en español con:
+            gh issue comment ${{ github.event.issue.number }} --body "<diagnóstico>"
+
+            El comentario debe tener esta estructura:
+            - **Resumen**: qué está pidiendo o reportando el issue, en una o dos frases.
+            - **Causa probable / hipótesis**: si es un bug, qué parte del código
+              probablemente lo causa (cita funciones y archivos concretos, ej.
+              `collide()`, `tryRotate()`, `loop()` en game.js). Si es una
+              funcionalidad nueva, qué partes del código habría que tocar.
+            - **Archivos y funciones involucrados**: lista concreta.
+            - **Enfoque de solución propuesto**: pasos de alto nivel para
+              implementar el fix o la feature (esto es insumo para el desarrollo
+              posterior, no lo implementes tú).
+            - **Información faltante**: si el issue está incompleto o ambiguo,
+              pide aclaración aquí en vez de inventar suposiciones.
+
+            Si el issue ya tiene un comentario de diagnóstico tuyo previo (esto
+            puede pasar en eventos "edited"), no dupliques el análisis: revisa
+            los comentarios existentes primero con
+            gh issue view ${{ github.event.issue.number }} --comments
+            y decide si vale la pena actualizar los labels o añadir solo una
+            nota breve en vez de un diagnóstico completo nuevo.
+
+            Sé conciso, concreto y evita relleno. No hagas cambios de código en
+            este paso.
