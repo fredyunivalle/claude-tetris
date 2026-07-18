@@ -77,6 +77,11 @@ jobs:
 
             ## 2. Publicar diagnóstico
 
+            El comentario debe estar en formato Markdown válido que GitHub
+            pueda renderizar correctamente (encabezados con `**negrita**`,
+            listas con `-`, código inline con backticks, bloques de código
+            con \`\`\` cuando cites fragmentos).
+
             Publica UN comentario en español con:
             gh issue comment ${{ github.event.issue.number }} --body "<diagnóstico>"
 
