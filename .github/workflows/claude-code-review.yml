@@ -1,0 +1,47 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    # Opcional: revisar solo si cambian ciertos archivos (ahorra cuota)
+    # paths:
+    #   - "**/*.js"
+    #   - "**/*.html"
+    #   - "**/*.css"
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # necesario para que Claude publique el comentario del review
+      issues: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Revisa este pull request y da feedback claro y constructivo, en español, sobre:
+            - Calidad del código y buenas prácticas
+            - Posibles bugs o casos borde no cubiertos
+            - Rendimiento (especialmente el game loop y el renderizado en canvas)
+            - Legibilidad y mantenibilidad
+
+            Si el repo tiene un archivo CLAUDE.md, úsalo como guía de estilo y convenciones.
+            Sé concreto: cita archivos y líneas cuando sea posible. Si no hay problemas
+            relevantes, dilo de forma breve en lugar de inventar observaciones.
+
+            IMPORTANTE: publica tu review usando la herramienta Bash con:
+            gh pr comment ${{ github.event.pull_request.number }} --body "<tu review>"
