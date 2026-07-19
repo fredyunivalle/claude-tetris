@@ -30,6 +30,53 @@ const PIECES = [
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
+// Visual skins: each provides a full color palette (parallel to COLORS,
+// index 0 unused/null, 1-8 per piece type) plus optional rendering flags
+// consumed by drawBlock(). Adding a skin only requires an entry here.
+const SKIN_STORAGE_KEY = 'tetris-skin';
+
+const SKINS = {
+  retro: {
+    label: 'Retro',
+    colors: COLORS,
+  },
+  neon: {
+    label: 'Neon',
+    colors: [
+      null,
+      '#00f0ff', // I
+      '#faff00', // O
+      '#ff00e6', // T
+      '#00ff85', // S
+      '#ff1744', // Z
+      '#2979ff', // J
+      '#ff9100', // L
+      '#b0bec5', // Nut
+    ],
+    glow: 16,
+  },
+  pastel: {
+    label: 'Pastel',
+    colors: [
+      null,
+      '#aee8ee', // I
+      '#fff2b2', // O
+      '#e3bfe8', // T
+      '#b9e6c3', // S
+      '#f4b8b8', // Z
+      '#bcd4f6', // J
+      '#f6d3ac', // L
+      '#cfd6dc', // Nut
+    ],
+    rounded: 7,
+  },
+  pixel: {
+    label: 'Pixel Art',
+    colors: COLORS,
+    texture: true,
+  },
+};
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -42,12 +89,35 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggleBtn = document.getElementById('theme-toggle');
+const skinSelect = document.getElementById('skin-select');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let currentSkin = 'retro';
 let gridColor = getGridColor();
 
 function getGridColor() {
   return getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim();
+}
+
+function loadSkin() {
+  try {
+    const saved = localStorage.getItem(SKIN_STORAGE_KEY);
+    return saved && SKINS[saved] ? saved : 'retro';
+  } catch (e) {
+    return 'retro';
+  }
+}
+
+function setSkin(skin) {
+  currentSkin = SKINS[skin] ? skin : 'retro';
+  document.documentElement.dataset.skin = currentSkin;
+  gridColor = getGridColor();
+  if (skinSelect) skinSelect.value = currentSkin;
+  try {
+    localStorage.setItem(SKIN_STORAGE_KEY, currentSkin);
+  } catch (e) {
+    // localStorage unavailable (private mode, etc.) - skin still applies for this session
+  }
 }
 
 function createBoard() {
@@ -164,16 +234,69 @@ function updateHUD() {
   levelEl.textContent = level;
 }
 
+function roundedRectPath(context, x, y, w, h, r) {
+  context.moveTo(x + r, y);
+  context.arcTo(x + w, y, x + w, y + h, r);
+  context.arcTo(x + w, y + h, x, y + h, r);
+  context.arcTo(x, y + h, x, y, r);
+  context.arcTo(x, y, x + w, y, r);
+  context.closePath();
+}
+
+function drawPixelTexture(context, px, py, s) {
+  const cell = Math.max(4, Math.floor(s / 4));
+  for (let ry = 0; ry < s; ry += cell) {
+    for (let rx = 0; rx < s; rx += cell) {
+      const dark = ((rx / cell) + (ry / cell)) % 2 === 0;
+      context.fillStyle = dark ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.10)';
+      context.fillRect(px + rx, py + ry, cell, cell);
+    }
+  }
+}
+
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
+  const skin = SKINS[currentSkin] || SKINS.retro;
+  const color = skin.colors[colorIndex] || COLORS[colorIndex];
+  const px = x * size + 1;
+  const py = y * size + 1;
+  const s = size - 2;
+
+  context.save();
   context.globalAlpha = alpha ?? 1;
+
+  context.beginPath();
+  if (skin.rounded) {
+    const r = Math.min(skin.rounded, s / 2);
+    if (typeof context.roundRect === 'function') {
+      context.roundRect(px, py, s, s, r);
+    } else {
+      roundedRectPath(context, px, py, s, s, r);
+    }
+  } else {
+    context.rect(px, py, s, s);
+  }
+
+  if (skin.glow) {
+    context.shadowColor = color;
+    context.shadowBlur = skin.glow;
+  }
   context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
-  context.globalAlpha = 1;
+  context.fill();
+  // reset shadow so it doesn't bleed into the highlight/texture below or later draws
+  context.shadowBlur = 0;
+  context.shadowColor = 'transparent';
+
+  // clip decorative overlay to the block's own shape (rounded or square)
+  context.clip();
+  if (skin.texture) {
+    drawPixelTexture(context, px, py, s);
+  } else {
+    context.fillStyle = 'rgba(255,255,255,0.12)';
+    context.fillRect(px, py, s, 4);
+  }
+
+  context.restore();
 }
 
 function drawGrid() {
@@ -319,4 +442,13 @@ themeToggleBtn.addEventListener('click', () => {
   if (next) drawNext();
 });
 
+if (skinSelect) {
+  skinSelect.addEventListener('change', () => {
+    setSkin(skinSelect.value);
+    if (current) draw();
+    if (next) drawNext();
+  });
+}
+
+setSkin(loadSkin());
 init();
