@@ -52,6 +52,19 @@
   --toggle-border: #c6c9db;
 }
 
+/* ---- Skins de tablero (independiente del tema claro/oscuro) ---- */
+[data-skin='neon'] {
+  --board-bg: #000000;
+  --board-border: #00f0ff;
+  --grid-color: #002b2e;
+}
+
+[data-skin='pastel'] {
+  --board-bg: #fdf6ee;
+  --board-border: #e3bfe8;
+  --grid-color: #ecdff0;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -127,6 +140,22 @@ body {
   border: 1px solid var(--board-border);
   background: var(--board-bg);
   border-radius: 4px;
+}
+
+/* ---- Selector de skin ---- */
+#skin-select {
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+#skin-select:focus {
+  outline: 1px solid var(--value-color);
 }
 
 /* ---- Controles ---- */
